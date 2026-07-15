@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>FOX TWO — Dogfight</title>
+<link rel="stylesheet" href="style.css" />
+<!-- PeerJS (online mode only). If it fails to load, LOCAL play still works.
+     Pinned + SRI-hashed so a CDN compromise can't inject code. -->
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"
+        integrity="sha384-nlUQ8ZqCbvStErob+biJNzSgltf6urV3VGqhfIfzhmg9RXmpeRm76ELw0pYnKlTR"
+        crossorigin="anonymous"></script>
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <!-- ================= UI OVERLAYS ================= -->
+  <div id="ui">
+
+    <!-- Persistent controls -->
+    <button id="btn-mute" class="corner-btn" title="Mute (M)">♪ SOUND</button>
+
+    <!-- TITLE -->
+    <section id="s-title" class="screen">
+      <h1 class="logo">FOX<span class="two"> TWO</span></h1>
+      <p class="tag">CARRIER-BORNE JET COMBAT · SUNSET PATROL</p>
+      <button class="btn big" data-go="menu">▶ START</button>
+      <p class="fine">A 2-player dogfight. Best of five. Guns · Fox Two · Flares.</p>
+    </section>
+
+    <!-- MAIN MENU -->
+    <section id="s-menu" class="screen hidden">
+      <h2 class="hdr">SELECT MISSION</h2>
+      <div class="callsigns">
+        <label class="cs p1">P1 CALLSIGN
+          <input id="cs1" class="cs-input" maxlength="8" value="FALCON" spellcheck="false" />
+        </label>
+        <label class="cs p2">P2 CALLSIGN
+          <input id="cs2" class="cs-input" maxlength="8" value="RAZOR" spellcheck="false" />
+        </label>
+      </div>
+      <div class="map-select">
+        <span class="map-title">ARENA</span>
+        <div class="map-opts" id="map-opts">
+          <button class="map-opt" data-map="0"><b>OPEN SKIES</b><span>no obstacles</span></button>
+          <button class="map-opt" data-map="1"><b>CARRIER</b><span>1 carrier</span></button>
+          <button class="map-opt sel" data-map="2"><b>TASK FORCE</b><span>carrier + 2 destroyers</span></button>
+        </div>
+      </div>
+      <div class="btn-col">
+        <button class="btn big" data-go="local">LOCAL 1V1 <span class="sub">two pilots, one keyboard</span></button>
+        <button class="btn" data-go="practice">PRACTICE <span class="sub">vs. AI wingman</span></button>
+        <button class="btn" data-go="online">ONLINE 1V1 <span class="sub">peer-to-peer, share a code</span></button>
+      </div>
+      <div class="row-links">
+        <button class="link" data-modal="m-howto">HOW TO PLAY</button>
+        <span class="dot">·</span>
+        <button class="link" data-modal="m-controls">CONTROLS</button>
+      </div>
+    </section>
+
+    <!-- ONLINE CHOICE -->
+    <section id="s-online" class="screen hidden">
+      <h2 class="hdr">ONLINE 1V1</h2>
+      <label class="cs solo">YOUR CALLSIGN
+        <input id="cs-online" class="cs-input" maxlength="8" value="GHOST" spellcheck="false" />
+      </label>
+      <div class="btn-col">
+        <button class="btn big" data-go="host">HOST A FIGHT <span class="sub">create a room</span></button>
+        <button class="btn big" data-go="join">JOIN A FIGHT <span class="sub">enter a code</span></button>
+      </div>
+      <p class="fine">Peer-to-peer via WebRTC. Best on decent, same-region connections. The host runs the sim (a small, fair latency edge).</p>
+      <button class="link back" data-go="menu">‹ BACK</button>
+    </section>
+
+    <!-- HOST -->
+    <section id="s-host" class="screen hidden">
+      <h2 class="hdr">HOSTING</h2>
+      <p class="fine">Send this code (or link) to your wingman. Waiting for them to join…</p>
+      <div class="code-box"><span id="host-code">····</span></div>
+      <button id="copy-link" class="btn">COPY INVITE LINK</button>
+      <p id="host-status" class="status">Opening room…</p>
+      <div class="spinner"></div>
+      <button class="link back" data-go="online-cancel">‹ CANCEL</button>
+    </section>
+
+    <!-- JOIN -->
+    <section id="s-join" class="screen hidden">
+      <h2 class="hdr">JOIN A FIGHT</h2>
+      <p class="fine">Enter the 4-character room code from your host.</p>
+      <input id="join-code" class="code-input" maxlength="4" placeholder="CODE" spellcheck="false" />
+      <button class="btn big" data-go="join-go">CONNECT</button>
+      <p id="join-status" class="status"></p>
+      <button class="link back" data-go="online-cancel">‹ BACK</button>
+    </section>
+
+    <!-- MODAL: HOW TO PLAY -->
+    <section id="m-howto" class="modal hidden">
+      <div class="modal-box">
+        <h2 class="hdr">HOW TO PLAY</h2>
+        <p>You're an elite naval aviator. Out-fly your rival and score <b>3 round wins</b> to take the match.</p>
+        <ul class="how">
+          <li><b class="c-guns">GUNS</b> — short range, must be aimed. Fire in <b>bursts</b> — hold the trigger too long and they <b>OVERHEAT</b> and lock out for a while. Ease off and they cool on their own.</li>
+          <li><b class="c-fox">FOX TWO</b> (IR missile) — hold the enemy in your nose cone until <b>LOCK</b>, then fire. Chases heat; 4 per round with a short reload between launches.</li>
+          <li><b class="c-flare">FLARES</b> — pop hot decoys to spoof an inbound missile. <b>Flare AND break hard</b> together to shake it.</li>
+        </ul>
+        <p class="tips"><b>Energy:</b> slow = tight turns, fast = wide. <b>Afterburner</b> is fast but lights you up like a beacon on IR — easy to lock. Watch for <span class="warn">MISSILE</span> warnings and defend!</p>
+        <p class="tips"><b>Ships</b> (carrier &amp; destroyers) block guns, missiles and line-of-sight — use them for cover, but don't scrape the hull. Pick your <b>arena</b> on the menu. Stay inside the <b>combat zone</b> — the edges are hard walls, so no running off-screen.</p>
+        <button class="btn" data-close>GOT IT</button>
+      </div>
+    </section>
+
+    <!-- MODAL: CONTROLS -->
+    <section id="m-controls" class="modal hidden">
+      <div class="modal-box wide">
+        <h2 class="hdr">CONTROLS</h2>
+        <p class="fine">Click a key to rebind it. Physically separated clusters avoid keyboard "ghosting" so both pilots can move + fire at once.</p>
+        <div class="ctl-grid">
+          <div class="ctl-col p1"><h3>PLAYER 1 <span>(ICE-BLUE)</span></h3><div id="ctl-p1"></div></div>
+          <div class="ctl-col p2"><h3>PLAYER 2 <span>(SUNSET-RED)</span></h3><div id="ctl-p2"></div></div>
+        </div>
+        <p class="fine">Online: both pilots use the Player&nbsp;1 layout on their own keyboard. Global: <kbd>P</kbd> pause · <kbd>M</kbd> mute.</p>
+        <div class="row-links">
+          <button class="btn" data-close>DONE</button>
+          <button class="link" id="ctl-reset">RESET TO DEFAULT</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- PAUSE -->
+    <section id="o-pause" class="modal hidden">
+      <div class="modal-box">
+        <h2 class="hdr">PAUSED</h2>
+        <button class="btn big" data-go="resume">RESUME</button>
+        <button class="btn" data-go="quit">QUIT TO MENU</button>
+      </div>
+    </section>
+
+    <!-- MATCH END -->
+    <section id="o-end" class="modal hidden">
+      <div class="modal-box">
+        <h2 id="end-title" class="hdr big-win">SPLASH!</h2>
+        <p id="end-sub" class="win-sub">ICE WINS</p>
+        <button class="btn big" data-go="rematch">REMATCH</button>
+        <button class="btn" data-go="quit">BACK TO MENU</button>
+      </div>
+    </section>
+
+    <!-- DISCONNECT -->
+    <section id="o-disc" class="modal hidden">
+      <div class="modal-box">
+        <h2 class="hdr">OPPONENT DISCONNECTED</h2>
+        <p class="fine">The link was lost.</p>
+        <button class="btn big" data-go="quit">BACK TO MENU</button>
+      </div>
+    </section>
+
+    <!-- TOAST -->
+    <div id="o-toast" class="toast hidden"></div>
+
+    <!-- bottom hint -->
+    <div id="hint" class="hint hidden"></div>
+  </div>
+
+  <!-- CRT feel -->
+  <div class="crt"></div>
+  <div class="vignette"></div>
+
+  <!-- ===== scripts (classic, shared global scope; order matters) ===== -->
+  <script src="js/config.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/input.js"></script>
+  <script src="js/entities.js"></script>
+  <script src="js/render.js"></script>
+  <script src="js/ai.js"></script>
+  <script src="js/game.js"></script>
+  <script src="js/net.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
